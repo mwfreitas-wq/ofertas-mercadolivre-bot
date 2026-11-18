@@ -1,0 +1,36 @@
+name: Pipeline de Ofertas Mercado Livre
+
+on:
+  schedule:
+    # Executa a cada 3 horas: 12:00, 15:00, 18:00, 21:00 e 00:00 UTC
+    - cron: '0 12,15,18,21,0 * * *'
+  workflow_dispatch: # Permite disparo manual via painel do GitHub Actions
+
+jobs:
+  scrape-and-publish:
+    name: Scraping e Envio para Planilha
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar Dependências do Node
+        run: npm ci || npm install
+
+      - name: Instalar Navegador Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar Scraper e Conversor de Ofertas
+        env:
+          GAS_WEBHOOK_URL: ${{ secrets.GAS_WEBHOOK_URL }}
+          ML_COOKIES_JSON: ${{ secrets.ML_COOKIES_JSON }}
+          ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
+        run: node scraper.js

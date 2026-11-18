@@ -1,0 +1,27 @@
+{
+  "name": "mercadolivre-afiliados-bot",
+  "version": "1.0.0",
+  "description": "Sistema 100% autônomo de curadoria, conversão e publicação de ofertas do Mercado Livre Afiliados",
+  "main": "scraper.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node scraper.js",
+    "test": "node -e 'console.log(\"Setup OK\")'"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mercadolivre",
+    "afiliados",
+    "playwright",
+    "scraper",
+    "telegram",
+    "groq"
+  ],
+  "author": "Mercado Livre Afiliados Bot",
+  "license": "MIT"
+}
