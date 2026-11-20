@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Radar de Ofertas | Melhores Descontos do Mercado Livre</title>
-  <meta name="description" content="Encontre as melhores ofertas selecionadas e com desconto real no Mercado Livre em tempo real.">
-  
-  <!-- Favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>">
+  <title>Radar de Ofertas | Mercado Livre & Shopee + Cupons Verificados</title>
+  <meta name="description" content="Ofertas reais e cupons verificados do Mercado Livre e da Shopee reunidos em um só lugar.">
+
+  <link rel="icon" href="logo.png" type="image/png">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -21,7 +20,10 @@
               blue: '#2D3277',
               navy: '#1E2356',
               green: '#00A650',
-              gray: '#F5F5F5',
+            },
+            shopee: {
+              orange: '#EE4D2D',
+              dark: '#D73211',
             }
           }
         }
@@ -40,60 +42,61 @@
     }
     @keyframes pulse-slow {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.8; }
+      50% { opacity: 0.82; }
     }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800 antialiased min-h-screen flex flex-col font-sans">
 
-  <!-- Top Bar / Aviso -->
+  <!-- Top Bar -->
   <div class="bg-meli-blue text-white text-xs py-2 px-4 text-center font-medium flex items-center justify-center gap-2">
     <span class="inline-block w-2 h-2 rounded-full bg-meli-yellow animate-ping"></span>
-    <span>Atualizado automaticamente a cada poucas horas com ofertas verificadas do Mercado Livre!</span>
+    <span>Ofertas mais vendidas do <strong>Mercado Livre</strong> &amp; <strong>Shopee</strong> com cupons verificados!</span>
   </div>
 
   <!-- Header -->
   <header class="bg-meli-yellow shadow-md sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
-      
+
       <!-- Logo & Título -->
       <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-        <div class="flex items-center gap-2">
-          <div class="bg-meli-blue text-meli-yellow p-2 rounded-xl shadow-inner font-black text-xl tracking-wider">
-            ⚡ RADAR
-          </div>
+        <div class="flex items-center gap-2.5">
+          <img src="logo.png" alt="Radar de Ofertas" class="w-10 h-10 rounded-xl shadow-sm object-cover bg-meli-blue" onerror="this.style.display='none'">
           <div>
-            <h1 class="text-xl font-extrabold text-meli-blue tracking-tight leading-none">Ofertas Mercado Livre</h1>
-            <p class="text-xs font-semibold text-meli-navy opacity-80 mt-0.5">Curadoria de descontos reais</p>
+            <h1 class="text-xl font-extrabold text-meli-blue tracking-tight leading-none">Radar de Ofertas</h1>
+            <p class="text-xs font-semibold text-meli-navy opacity-80 mt-0.5">Mercado Livre • Shopee • Cupons</p>
           </div>
         </div>
 
-        <!-- Badge Contador Mobile -->
         <span id="mobileBadgeCount" class="md:hidden bg-meli-blue text-white text-xs font-bold px-2.5 py-1 rounded-full">
           0 ofertas
         </span>
       </div>
 
-      <!-- Barra de Busca Instantânea -->
+      <!-- Busca Instantânea -->
       <div class="w-full md:max-w-xl relative">
         <div class="relative flex items-center">
-          <input 
-            type="text" 
+          <input
+            type="text"
             id="searchInput"
-            placeholder="🔍 Digite o nome ou código MLB (ex: MLB3829...)" 
+            placeholder="🔍 Busque por produto, loja, cupom ou código..."
             class="w-full pl-11 pr-10 py-2.5 text-sm bg-white rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-meli-blue focus:border-transparent shadow-sm text-gray-900 transition-all placeholder:text-gray-400"
           >
-          <span class="absolute left-4 text-gray-400 pointer-events-none text-base">
+          <span class="absolute left-4 text-gray-400 pointer-events-none">
             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           </span>
-          <button id="clearSearchBtn" class="hidden absolute right-3.5 text-gray-400 hover:text-gray-700 text-sm font-bold bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center">
+          <button id="clearSearchBtn" class="hidden absolute right-3.5 text-gray-500 hover:text-gray-800 text-xs font-bold bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center">
             ✕
           </button>
         </div>
       </div>
 
-      <!-- Ações Header Desktop -->
+      <!-- Ações Desktop -->
       <div class="hidden md:flex items-center gap-3">
+        <a href="https://t.me/ofertas_mercadolivre_cupom" target="_blank" rel="noopener noreferrer" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-2 rounded-full shadow-sm transition flex items-center gap-1.5">
+          <span>✈️</span>
+          <span>Canal Telegram</span>
+        </a>
         <span id="badgeCount" class="bg-white text-meli-blue border border-meli-blue/20 text-xs font-extrabold px-3 py-1.5 rounded-full shadow-sm">
           Carregando...
         </span>
@@ -101,44 +104,35 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
         </button>
       </div>
-
     </div>
 
-    <!-- Filtros de Ordenação Rápidos -->
-    <div class="bg-yellow-400/70 border-t border-yellow-300 px-4 py-2">
-      <div class="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-2 text-xs font-semibold text-meli-navy">
-        <div class="flex items-center gap-1.5 flex-nowrap shrink-0">
-          <span class="text-gray-600 mr-1 hidden sm:inline">Ordenar:</span>
-          <button data-sort="recent" class="sort-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs">Mais Recentes</button>
-          <button data-sort="discount" class="sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition">Maior Desconto</button>
-          <button data-sort="price-low" class="sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition">Menor Preço</button>
+    <!-- Barra de Filtros de Loja + Ordenação -->
+    <div class="bg-yellow-400/75 border-t border-yellow-300 px-4 py-2">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-meli-navy">
+        <!-- Filtros de Loja e Cupom -->
+        <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap">
+          <button data-store="all" class="store-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs whitespace-nowrap">Todas</button>
+          <button data-store="Mercado Livre" class="store-btn px-3 py-1 rounded-full bg-white/85 hover:bg-white text-meli-blue transition whitespace-nowrap">🟡 Mercado Livre</button>
+          <button data-store="Shopee" class="store-btn px-3 py-1 rounded-full bg-white/85 hover:bg-white text-shopee-orange transition whitespace-nowrap">🟠 Shopee</button>
+          <button data-store="coupon" class="store-btn px-3 py-1 rounded-full bg-white/85 hover:bg-white text-emerald-700 transition whitespace-nowrap">🎟️ Com Cupom</button>
         </div>
-        <div class="text-xs text-meli-blue/80 font-medium shrink-0">
-          ⚡ Links oficiais de afiliados
+
+        <!-- Ordenação -->
+        <div class="flex items-center gap-1.5 overflow-x-auto flex-nowrap">
+          <span class="text-gray-700 mr-1 hidden sm:inline">Ordenar:</span>
+          <button data-sort="recent" class="sort-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs whitespace-nowrap">Mais Recentes</button>
+          <button data-sort="discount" class="sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition whitespace-nowrap">Maior Desconto</button>
+          <button data-sort="price-low" class="sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition whitespace-nowrap">Menor Preço</button>
         </div>
       </div>
     </div>
   </header>
-
-  <!-- Banner Informativo Configuração (Oculto se configurado) -->
-  <div id="configNotice" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-      <div class="text-sm text-blue-900">
-        <p class="font-bold">⚙️ Modo de Demonstração Ativo</p>
-        <p class="text-xs text-blue-700 mt-0.5">Para conectar à sua planilha real, cole a URL do seu Web App no início da tag <code>&lt;script&gt;</code> do arquivo <code>docs/index.html</code>.</p>
-      </div>
-      <button onclick="document.getElementById('configNotice').classList.add('hidden')" class="text-xs bg-blue-600 text-white font-semibold px-3 py-1.5 rounded hover:bg-blue-700 transition">
-        Entendi
-      </button>
-    </div>
-  </div>
 
   <!-- Conteúdo Principal -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
 
     <!-- Loading Skeleton -->
     <div id="loadingState" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-      <!-- 8 skeletons simulando cards -->
       <template id="skeletonTemplate">
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 animate-pulse flex flex-col justify-between h-96">
           <div class="w-full h-48 bg-gray-200 rounded-xl mb-4"></div>
@@ -155,59 +149,47 @@
       </template>
     </div>
 
-    <!-- Estado Vazio / Sem Resultados -->
+    <!-- Estado Vazio -->
     <div id="emptyState" class="hidden text-center py-16 px-4">
       <div class="w-20 h-20 bg-yellow-100 text-meli-blue rounded-full flex items-center justify-center mx-auto text-4xl mb-4 shadow-inner">
         🔍
       </div>
-      <h3 class="text-lg font-bold text-gray-800">Nenhum produto encontrado</h3>
-      <p class="text-sm text-gray-500 max-w-md mx-auto mt-1" id="emptyStateMessage">
-        Tente pesquisar com outros termos ou limpe o campo de busca.
+      <h3 class="text-lg font-bold text-gray-800">Nenhuma oferta encontrada</h3>
+      <p class="text-sm text-gray-500 max-w-md mx-auto mt-1">
+        Tente outro filtro ou aguarde as próximas publicações do nosso canal.
       </p>
-      <button onclick="limparBusca()" class="mt-4 px-4 py-2 bg-meli-blue text-white text-xs font-bold rounded-full hover:bg-meli-navy transition shadow-sm">
-        Limpar Pesquisa
+      <button onclick="limparFiltros()" class="mt-4 px-4 py-2 bg-meli-blue text-white text-xs font-bold rounded-full hover:bg-meli-navy transition shadow-sm">
+        Limpar Filtros
       </button>
     </div>
 
     <!-- Grid de Produtos -->
-    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-      <!-- Cards são injetados dinamicamente via JS -->
-    </div>
-
+    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"></div>
   </main>
 
-  <!-- Toast Notification -->
+  <!-- Toast -->
   <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl transition-all duration-300 opacity-0 translate-y-3 pointer-events-none z-50 flex items-center gap-2">
     <span>📋</span>
-    <span id="toastMessage">Código MLB copiado!</span>
+    <span id="toastMessage">Copiado!</span>
   </div>
 
   <!-- Footer -->
   <footer class="bg-white border-t border-gray-200 mt-12 py-8 text-center text-xs text-gray-500">
     <div class="max-w-7xl mx-auto px-4 space-y-2">
-      <p class="font-medium text-gray-700">Radar de Ofertas do Mercado Livre • Sistema 100% Autônomo e Gratuito</p>
-      <p class="text-gray-400">Os preços e estoques dos produtos exibidos são de inteira responsabilidade do Mercado Livre e dos seus vendedores.</p>
-      <p class="text-gray-400">Ao clicar em comprar, você será redirecionado para a plataforma oficial do Mercado Livre.</p>
+      <p class="font-medium text-gray-700">Radar de Ofertas • Mercado Livre &amp; Shopee</p>
+      <p class="text-gray-400">Os preços, estoques e validade dos cupons são de responsabilidade das lojas oficiais.</p>
+      <p class="text-gray-400">Ao clicar em comprar, você será redirecionado com segurança para o site ou app oficial.</p>
     </div>
   </footer>
 
-  <!-- Lógica JavaScript Vanilla -->
   <script>
-    /**
-     * =========================================================================
-     * CONFIGURAÇÃO DA VITRINE:
-     * Cole abaixo a URL do seu Google Apps Script (Web App publicado via doGet).
-     * Se deixado vazio ou com valor padrão, exibirá produtos demonstrativos.
-     * =========================================================================
-     */
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxqLd4weUfIuY1Qu6pUq3CLPlKAlBltvavKBQ3weMzP1bdL7FljcpMRGsBusxh3hYZjig/exec";
 
-    // Estado da Aplicação
     let allProducts = [];
     let filteredProducts = [];
     let currentSort = 'recent';
+    let currentStoreFilter = 'all';
 
-    // Elementos DOM
     const productsGrid = document.getElementById('productsGrid');
     const loadingState = document.getElementById('loadingState');
     const emptyState = document.getElementById('emptyState');
@@ -216,10 +198,9 @@
     const badgeCount = document.getElementById('badgeCount');
     const mobileBadgeCount = document.getElementById('mobileBadgeCount');
     const refreshBtn = document.getElementById('refreshBtn');
-    const configNotice = document.getElementById('configNotice');
     const sortButtons = document.querySelectorAll('.sort-btn');
+    const storeButtons = document.querySelectorAll('.store-btn');
 
-    // Inicialização dos Skeletons
     function renderSkeletons() {
       const template = document.getElementById('skeletonTemplate');
       loadingState.innerHTML = '';
@@ -229,61 +210,31 @@
       loadingState.classList.remove('hidden');
     }
 
-    /**
-     * Carrega produtos do Google Apps Script ou usa demonstração
-     */
     async function loadProducts() {
       renderSkeletons();
       productsGrid.innerHTML = '';
       emptyState.classList.add('hidden');
 
-      const isConfigured = GAS_API_URL && !GAS_API_URL.includes("SUA_WEBAPP_URL");
-
-      if (!isConfigured) {
-        configNotice.classList.remove('hidden');
-        // Dados de demonstração realistas para visualização imediata
-        setTimeout(() => {
-          allProducts = getDemoProducts();
-          applyFiltersAndSort();
-          loadingState.classList.add('hidden');
-        }, 600);
-        return;
-      }
-
-      configNotice.classList.add('hidden');
-
       try {
         const response = await fetch(GAS_API_URL, { cache: 'no-store' });
-        if (!response.ok) throw new Error("Erro de resposta HTTP: " + response.status);
+        if (!response.ok) throw new Error("HTTP " + response.status);
         const data = await response.json();
-
-        if (Array.isArray(data) && data.length > 0) {
-          allProducts = data;
-        } else {
-          allProducts = [];
-        }
+        allProducts = Array.isArray(data) ? data : [];
       } catch (err) {
-        console.warn("⚠️ Falha ao buscar dados do Google Apps Script:", err.message);
-        // Fallback em caso de erro temporário da API
-        allProducts = getDemoProducts();
+        console.warn("⚠️ Erro ao carregar ofertas:", err.message);
+        allProducts = [];
       } finally {
         applyFiltersAndSort();
         loadingState.classList.add('hidden');
       }
     }
 
-    /**
-     * Extrai número float a partir de strings monetárias em formato brasileiro (R$ 1.299,90)
-     */
     function parsePrice(str) {
       if (!str) return 0;
       const clean = String(str).replace(/[^\d,]/g, '').replace(',', '.');
       return parseFloat(clean) || 0;
     }
 
-    /**
-     * Calcula o percentual de desconto entre o preço antigo e o atual
-     */
     function calculateDiscount(oldPriceStr, currentPriceStr) {
       const oldP = parsePrice(oldPriceStr);
       const curP = parsePrice(currentPriceStr);
@@ -293,81 +244,114 @@
       return 0;
     }
 
-    /**
-     * Aplica busca textual e ordenação atual
-     */
+    function getStore(item) {
+      if (item.store) return item.store;
+      if (/shopee|shope\.ee/i.test(item.affiliateUrl || '')) return 'Shopee';
+      return 'Mercado Livre';
+    }
+
     function applyFiltersAndSort() {
       const query = searchInput.value.trim().toLowerCase();
 
-      // Filtro de Busca
       filteredProducts = allProducts.filter(item => {
-        const titleMatch = (item.title || '').toLowerCase().includes(query);
-        const idMatch = (item.id || '').toLowerCase().includes(query);
-        return titleMatch || idMatch;
+        const store = getStore(item);
+        const coupon = (item.coupon || '').trim();
+
+        if (currentStoreFilter === 'coupon' && !coupon) return false;
+        if (currentStoreFilter !== 'all' && currentStoreFilter !== 'coupon' && store !== currentStoreFilter) {
+          return false;
+        }
+
+        if (!query) return true;
+        return (
+          (item.title || '').toLowerCase().includes(query) ||
+          (item.id || '').toLowerCase().includes(query) ||
+          store.toLowerCase().includes(query) ||
+          coupon.toLowerCase().includes(query)
+        );
       });
 
-      // Ordenação
       if (currentSort === 'discount') {
-        filteredProducts.sort((a, b) => {
-          const discA = calculateDiscount(a.oldPrice, a.price);
-          const discB = calculateDiscount(b.oldPrice, b.price);
-          return discB - discA;
-        });
+        filteredProducts.sort((a, b) => calculateDiscount(b.oldPrice, b.price) - calculateDiscount(a.oldPrice, a.price));
       } else if (currentSort === 'price-low') {
-        filteredProducts.sort((a, b) => {
-          return parsePrice(a.price) - parsePrice(b.price);
-        });
+        filteredProducts.sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
       }
-      // 'recent' mantém a ordem vinda da API (já decrescente por publicação)
 
       renderProducts(filteredProducts);
-      updateBadges(filteredProducts.length, allProducts.length);
+      badgeCount.textContent = `${filteredProducts.length} de ${allProducts.length} ofertas`;
+      mobileBadgeCount.textContent = `${filteredProducts.length} ofertas`;
     }
 
-    /**
-     * Renderiza os cards no grid
-     */
     function renderProducts(items) {
       productsGrid.innerHTML = '';
-
       if (items.length === 0) {
         emptyState.classList.remove('hidden');
         return;
       }
-
       emptyState.classList.add('hidden');
 
       const fragment = document.createDocumentFragment();
 
       items.forEach(product => {
+        const store = getStore(product);
+        const isShopee = store === 'Shopee';
         const discount = calculateDiscount(product.oldPrice, product.price);
-        const card = document.createElement('div');
-        card.className = "bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col justify-between group relative";
+        const coupon = (product.coupon || '').trim();
+        const buyUrl = product.affiliateUrl || (isShopee ? 'https://shopee.com.br' : 'https://www.mercadolivre.com.br');
+        const fallbackImg = isShopee
+          ? 'https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/ca5d12864c12916c05640b36e47ac5c9.png'
+          : 'https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.5/mercadolibre/logo__large_plus.png';
 
-        const buyUrl = product.affiliateUrl || "https://www.mercadolivre.com.br";
-        const fallbackImg = "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.5/mercadolivre/logo__large_plus.png";
+        const storeBadgeHtml = isShopee
+          ? `<span class="inline-flex items-center gap-1 bg-shopee-orange text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">🟠 Shopee</span>`
+          : `<span class="inline-flex items-center gap-1 bg-meli-yellow text-meli-blue text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs border border-yellow-300">🟡 Mercado Livre</span>`;
+
+        const couponBlockHtml = coupon ? `
+          <div class="mb-3 bg-emerald-50 border border-dashed border-emerald-400 rounded-xl px-2.5 py-2 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold uppercase text-emerald-700 leading-none">🎟️ Cupom Verificado</div>
+              <div class="text-xs font-mono font-black text-emerald-900 truncate mt-0.5">${escapeHtml(coupon)}</div>
+            </div>
+            <button
+              onclick="copiarTexto('${escapeJs(coupon)}', 'Cupom ${escapeJs(coupon)} copiado!')"
+              class="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95"
+            >
+              Copiar
+            </button>
+          </div>
+        ` : '';
+
+        const buyBtnClass = isShopee
+          ? 'bg-shopee-orange hover:bg-shopee-dark text-white'
+          : 'bg-meli-yellow hover:bg-yellow-400 text-meli-navy';
+
+        const buyBtnLabel = isShopee ? 'Comprar na Shopee' : 'Comprar no Mercado Livre';
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 flex flex-col justify-between group relative';
 
         card.innerHTML = `
           <div>
-            <!-- Imagem e Badges -->
-            <div class="relative w-full h-48 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 mb-3">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              ${storeBadgeHtml}
+              <button
+                onclick="copiarTexto('${escapeJs(product.id || '')}', 'Código ${escapeJs(product.id || '')} copiado!')"
+                title="Copiar código"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-mono px-2 py-0.5 rounded transition"
+              >
+                ${escapeHtml(product.id || '')}
+              </button>
+            </div>
+
+            <div class="relative w-full h-44 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 mb-3">
               ${discount > 0 ? `
                 <span class="absolute top-2 left-2 z-10 bg-meli-green text-white text-xs font-black px-2.5 py-1 rounded-md shadow-md badge-pulse">
                   ${discount}% OFF
                 </span>
               ` : ''}
 
-              <button 
-                onclick="copiarCodigo('${product.id}')" 
-                title="Copiar código MLB"
-                class="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white text-gray-600 hover:text-meli-blue text-[10px] font-mono px-2 py-0.5 rounded shadow-xs border border-gray-200 transition active:scale-95 flex items-center gap-1"
-              >
-                <span>${product.id || 'MLB'}</span>
-                <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-              </button>
-
-              <img 
-                src="${product.image || fallbackImg}" 
+              <img
+                src="${product.image || fallbackImg}"
                 alt="${escapeHtml(product.title)}"
                 loading="lazy"
                 onerror="this.src='${fallbackImg}'; this.className='max-h-16 object-contain opacity-50';"
@@ -375,34 +359,29 @@
               >
             </div>
 
-            <!-- Título -->
             <h2 class="text-xs sm:text-sm font-semibold text-gray-800 line-clamp-2 group-hover:text-meli-blue transition-colors leading-snug" title="${escapeHtml(product.title)}">
               ${escapeHtml(product.title)}
             </h2>
           </div>
 
-          <!-- Preços e Botão de Ação -->
           <div class="mt-4 pt-3 border-t border-gray-100">
             <div class="mb-3">
-              ${product.oldPrice ? `
-                <div class="text-[11px] text-gray-400 line-through leading-tight">
-                  De: ${product.oldPrice}
-                </div>
-              ` : '<div class="h-4"></div>'}
+              ${product.oldPrice ? `<div class="text-[11px] text-gray-400 line-through leading-tight">De: ${escapeHtml(product.oldPrice)}</div>` : '<div class="h-4"></div>'}
               <div class="text-lg sm:text-xl font-extrabold text-meli-blue tracking-tight flex items-baseline gap-1">
                 <span class="text-xs font-bold text-gray-500">Por:</span>
-                <span>${product.price}</span>
+                <span>${escapeHtml(product.price)}</span>
               </div>
             </div>
 
-            <!-- Botão de Compra -->
-            <a 
-              href="${buyUrl}" 
-              target="_blank" 
+            ${couponBlockHtml}
+
+            <a
+              href="${buyUrl}"
+              target="_blank"
               rel="noopener noreferrer"
-              class="w-full flex items-center justify-center gap-2 bg-meli-yellow hover:bg-yellow-400 text-meli-navy font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all active:scale-[0.98] text-xs sm:text-sm"
+              class="w-full flex items-center justify-center gap-2 ${buyBtnClass} font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all active:scale-[0.98] text-xs sm:text-sm"
             >
-              <span>Ver Oferta</span>
+              <span>${buyBtnLabel}</span>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
             </a>
           </div>
@@ -414,117 +393,73 @@
       productsGrid.appendChild(fragment);
     }
 
-    function updateBadges(shown, total) {
-      const text = `${shown} de ${total} ofertas`;
-      badgeCount.textContent = text;
-      mobileBadgeCount.textContent = `${shown} ofertas`;
-    }
-
-    function copiarCodigo(id) {
-      if (!id) return;
-      navigator.clipboard.writeText(id).then(() => {
-        mostrarToast(`Código ${id} copiado!`);
-      }).catch(() => {
-        mostrarToast(`Código: ${id}`);
-      });
+    function copiarTexto(texto, mensagem) {
+      if (!texto) return;
+      navigator.clipboard.writeText(texto).then(() => mostrarToast(mensagem || 'Copiado!')).catch(() => mostrarToast(texto));
     }
 
     function mostrarToast(msg) {
       const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toastMessage');
-      toastMsg.textContent = msg;
+      document.getElementById('toastMessage').textContent = msg;
       toast.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
-      setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
-      }, 2500);
+      setTimeout(() => toast.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none'), 2500);
     }
 
-    function limparBusca() {
+    function limparFiltros() {
       searchInput.value = '';
       clearSearchBtn.classList.add('hidden');
+      currentStoreFilter = 'all';
+      storeButtons.forEach(b => {
+        b.className = b.getAttribute('data-store') === 'all'
+          ? 'store-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs whitespace-nowrap'
+          : 'store-btn px-3 py-1 rounded-full bg-white/85 hover:bg-white text-meli-blue transition whitespace-nowrap';
+      });
       applyFiltersAndSort();
-      searchInput.focus();
     }
 
     function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    // Ouvintes de Eventos
+    function escapeJs(str) {
+      return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
     searchInput.addEventListener('input', (e) => {
-      if (e.target.value.trim().length > 0) {
-        clearSearchBtn.classList.remove('hidden');
-      } else {
-        clearSearchBtn.classList.add('hidden');
-      }
+      clearSearchBtn.classList.toggle('hidden', e.target.value.trim().length === 0);
       applyFiltersAndSort();
     });
 
-    clearSearchBtn.addEventListener('click', limparBusca);
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      clearSearchBtn.classList.add('hidden');
+      applyFiltersAndSort();
+    });
+
     refreshBtn.addEventListener('click', loadProducts);
+
+    storeButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        storeButtons.forEach(b => {
+          b.className = 'store-btn px-3 py-1 rounded-full bg-white/85 hover:bg-white text-meli-blue transition whitespace-nowrap';
+        });
+        btn.className = 'store-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs whitespace-nowrap';
+        currentStoreFilter = btn.getAttribute('data-store');
+        applyFiltersAndSort();
+      });
+    });
 
     sortButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         sortButtons.forEach(b => {
-          b.className = 'sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition';
+          b.className = 'sort-btn px-3 py-1 rounded-full bg-white/80 hover:bg-white text-meli-blue transition whitespace-nowrap';
         });
-        btn.className = 'sort-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs';
+        btn.className = 'sort-btn px-3 py-1 rounded-full bg-meli-blue text-white shadow-xs whitespace-nowrap';
         currentSort = btn.getAttribute('data-sort');
         applyFiltersAndSort();
       });
     });
 
-    /**
-     * Retorna dados demonstrativos para visualização imediata antes de conectar o GAS
-     */
-    function getDemoProducts() {
-      return [
-        {
-          id: "MLB351294812",
-          title: "Fritadeira Sem Óleo Air Fryer 4L Digital Antiaderente Inox 127V",
-          oldPrice: "R$ 499,00",
-          price: "R$ 279,90",
-          image: "https://http2.mlstatic.com/D_NQ_NP_2X_897148-MLA74684947938_022024-F.webp",
-          affiliateUrl: "https://www.mercadolivre.com.br/ofertas",
-          publishedAt: new Date().toISOString()
-        },
-        {
-          id: "MLB481928472",
-          title: "Smart TV 50 Polegadas 4K UHD LED HDR Wi-Fi Bluetooth Inteligente",
-          oldPrice: "R$ 2.499,00",
-          price: "R$ 1.849,00",
-          image: "https://http2.mlstatic.com/D_NQ_NP_2X_654321-MLA71234567890_012024-F.webp",
-          affiliateUrl: "https://www.mercadolivre.com.br/ofertas",
-          publishedAt: new Date().toISOString()
-        },
-        {
-          id: "MLB982341029",
-          title: "Fone de Ouvido Bluetooth Sem Fio Cancelamento Ativo de Ruído Graves Fortes",
-          oldPrice: "R$ 299,00",
-          price: "R$ 139,90",
-          image: "https://http2.mlstatic.com/D_NQ_NP_2X_789123-MLA79876543210_032024-F.webp",
-          affiliateUrl: "https://www.mercadolivre.com.br/ofertas",
-          publishedAt: new Date().toISOString()
-        },
-        {
-          id: "MLB102938475",
-          title: "Cafeteira Elétrica Programável 30 Xícaras Filtro Permanente Inox",
-          oldPrice: "R$ 229,00",
-          price: "R$ 149,00",
-          image: "https://http2.mlstatic.com/D_NQ_NP_2X_912834-MLA71122334455_042024-F.webp",
-          affiliateUrl: "https://www.mercadolivre.com.br/ofertas",
-          publishedAt: new Date().toISOString()
-        }
-      ];
-    }
-
-    // Inicialização ao carregar a página
     document.addEventListener('DOMContentLoaded', loadProducts);
   </script>
 </body>

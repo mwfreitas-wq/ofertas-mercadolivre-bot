@@ -1,37 +1,44 @@
 /**
  * =========================================================================
- * SISTEMA AUTÔNOMO DE OFERTAS MERCADO LIVRE AFILIADOS
+ * RADAR DE OFERTAS MULTI-LOJA (MERCADO LIVRE + SHOPEE + CUPONS VERIFICADOS)
  * Google Apps Script (Google Sheets + Groq API + Telegram Bot)
  * =========================================================================
- * 
+ *
  * INSTRUÇÕES:
- * 1. Preencha as 4 constantes abaixo com seus dados.
- * 2. Execute 'setupPlanilha()' uma vez para criar as colunas.
- * 3. Faça a implantação como Web App (Executar como: Eu / Acesso: Qualquer pessoa).
- * 4. Copie a URL do Web App, cole em WEBAPP_URL e execute 'configurarWebhookTelegram()'.
- * 5. Crie um Acionador (Trigger) por tempo para 'dispararProximaOferta' (de 1 em 1 hora).
+ * 1. Preencha as 4 constantes abaixo (NO EDITOR DO APPS SCRIPT — nunca suba chaves reais no GitHub público).
+ * 2. Execute 'setupPlanilha()' uma vez para criar/atualizar as abas 'Fila' e 'Cupons'.
+ * 3. Em Implantar > Gerenciar implantações > Editar > Nova versão > Implantar.
+ * 4. Crie um Acionador (Trigger) por tempo para 'dispararProximaOferta' (A cada hora).
+ *    - Ele respeita automaticamente o horário de Brasília (08h às 22h) para não incomodar de madrugada!
  */
 
 // ========================== CONFIGURAÇÕES ==========================
 const TELEGRAM_BOT_TOKEN = "SEU_TELEGRAM_BOT_TOKEN_AQUI"; // Configure apenas no Google Apps Script
 const TELEGRAM_CHANNEL_ID = "@ofertas_mercadolivre_cupom"; // Canal público do Telegram
 const GROQ_API_KEY = "gsk_SEU_GROQ_API_KEY_AQUI";          // Configure apenas no Google Apps Script
-const WEBAPP_URL = "SUA_WEBAPP_URL_AQUI";                  // URL gerada na Implantação (Deploy) do Web App
+const WEBAPP_URL = "SUA_WEBAPP_URL_AQUI";                  // URL /exec da Implantação do Web App
+
 const SHEET_NAME = "Fila";
+const COUPONS_SHEET_NAME = "Cupons";
+
+// Janela de disparos automáticos (Horário de Brasília)
+const HORARIO_INICIO = 8;  // 08:00
+const HORARIO_FIM = 22;    // 22:59
 // ===================================================================
 
 /**
- * Cria e configura automaticamente a aba 'Fila' na planilha ativa
+ * Cria e atualiza automaticamente as abas 'Fila' e 'Cupons'
  */
 function setupPlanilha() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Aba Fila (10 colunas)
   let sheet = ss.getSheetByName(SHEET_NAME);
-  
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
   }
 
-  const headers = [
+  const headersFila = [
     "ID",
     "Titulo",
     "Preco_Antigo",
@@ -39,26 +46,45 @@ function setupPlanilha() {
     "Imagem_URL",
     "Link_Afiliado",
     "Status",
-    "Data_Hora"
+    "Data_Hora",
+    "Loja",
+    "Cupom"
   ];
 
-  const currentHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  const isSetupDone = headers.every((h, idx) => currentHeaders[idx] === h);
+  sheet.getRange(1, 1, 1, headersFila.length).setValues([headersFila]);
+  sheet.getRange(1, 1, 1, headersFila.length)
+    .setFontWeight("bold")
+    .setBackground("#FFE600")
+    .setFontColor("#2D3277")
+    .setHorizontalAlignment("center");
+  sheet.setFrozenRows(1);
 
-  if (!isSetupDone) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length)
-      .setFontWeight("bold")
-      .setBackground("#FFE600") // Amarelo característico do Mercado Livre
-      .setFontColor("#2D3277")
-      .setHorizontalAlignment("center");
-    
-    sheet.setFrozenRows(1);
-    sheet.autoResizeColumns(1, headers.length);
+  // 2. Aba Cupons Confiáveis (7 colunas)
+  let couponSheet = ss.getSheetByName(COUPONS_SHEET_NAME);
+  if (!couponSheet) {
+    couponSheet = ss.insertSheet(COUPONS_SHEET_NAME);
   }
 
-  Logger.log("✅ Aba '" + SHEET_NAME + "' configurada com sucesso!");
-  return "Aba configurada com sucesso!";
+  const headersCupons = [
+    "Loja",
+    "Codigo",
+    "Descricao",
+    "Valor_Minimo",
+    "Fonte_Confiavel",
+    "Validade",
+    "Ativo"
+  ];
+
+  couponSheet.getRange(1, 1, 1, headersCupons.length).setValues([headersCupons]);
+  couponSheet.getRange(1, 1, 1, headersCupons.length)
+    .setFontWeight("bold")
+    .setBackground("#2D3277")
+    .setFontColor("#FFFFFF")
+    .setHorizontalAlignment("center");
+  couponSheet.setFrozenRows(1);
+
+  Logger.log("✅ Abas '" + SHEET_NAME + "' e '" + COUPONS_SHEET_NAME + "' configuradas com sucesso!");
+  return "Planilha configurada com sucesso!";
 }
 
 /**
@@ -69,97 +95,117 @@ function configurarWebhookTelegram() {
     throw new Error("❌ Preencha TELEGRAM_BOT_TOKEN antes de vincular o webhook!");
   }
   if (!WEBAPP_URL || WEBAPP_URL.includes("SUA_WEBAPP_URL")) {
-    throw new Error("❌ Preencha WEBAPP_URL com a URL da sua implantação Web App antes de continuar!");
+    throw new Error("❌ Preencha WEBAPP_URL antes de vincular o webhook!");
   }
 
-  const url = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/setWebhook?url=" + encodeURIComponent(WEBAPP_URL);
+  const url = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/setWebhook?url=" + encodeURIComponent(WEBAPP_URL) + "&drop_pending_updates=true";
   const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   const result = JSON.parse(response.getContentText());
 
   if (result.ok) {
-    Logger.log("🎉 Webhook vinculado com sucesso ao Telegram: " + result.description);
+    Logger.log("🎉 Webhook vinculado com sucesso: " + result.description);
     return "Webhook vinculado: " + result.description;
   } else {
-    Logger.log("❌ Erro ao configurar webhook: " + response.getContentText());
-    throw new Error(result.description);
+    throw new Error(result.description || response.getContentText());
   }
 }
 
 /**
  * Endpoint POST híbrido:
- * 1. Recebe ofertas do Scraper do GitHub Actions
- * 2. Recebe mensagens diretas enviadas ao Bot no Telegram
+ * 1. Recebe ofertas + cupons verificados do scraper (PC / GitHub Actions / HostGator)
+ * 2. Recebe links manuais do Telegram (Mercado Livre ou Shopee, com ou sem cupom)
  */
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Servidor ocupado" }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return HtmlService.createHtmlOutput("BUSY");
   }
 
   try {
     if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Nenhum dado recebido" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return HtmlService.createHtmlOutput("EMPTY");
     }
 
     const payload = JSON.parse(e.postData.contents);
 
     // =========================================================================
-    // CASO A: Lote vindo do Scraper do GitHub Actions
+    // CASO A: Lote vindo do Scraper (Mercado Livre + Shopee + Cupons Verificados)
     // =========================================================================
-    if (payload.source === "github_scraper" && Array.isArray(payload.items)) {
+    if (payload.source === "github_scraper") {
       const sheet = getFilaSheet();
       const existingIds = getExistingProductIds(sheet);
       const rowsToAdd = [];
 
-      payload.items.forEach(function(item) {
-        const id = String(item.id || "").trim();
-        if (id && !existingIds.has(id)) {
-          existingIds.add(id);
-          rowsToAdd.push([
-            id,
-            item.title || "Oferta Especial",
-            item.oldPrice || "",
-            item.price || "Confira",
-            item.image || "",
-            item.affiliateUrl || item.cleanUrl || "",
-            "PENDENTE",
-            new Date().toISOString()
-          ]);
-        }
-      });
+      // 1. Atualiza cupons verificados se vierem no lote
+      let insertedCoupons = 0;
+      if (Array.isArray(payload.coupons) && payload.coupons.length > 0) {
+        insertedCoupons = salvarCuponsVerificados(payload.coupons);
+      }
+
+      // 2. Insere novos produtos sem duplicar
+      if (Array.isArray(payload.items)) {
+        payload.items.forEach(function(item) {
+          const id = String(item.id || "").trim();
+          if (id && !existingIds.has(id)) {
+            existingIds.add(id);
+            const store = item.store || detectarLojaPorUrl(item.affiliateUrl || item.cleanUrl || "");
+            rowsToAdd.push([
+              id,
+              item.title || "Oferta Especial",
+              item.oldPrice || "",
+              item.price || "Confira",
+              item.image || "",
+              item.affiliateUrl || item.cleanUrl || "",
+              "PENDENTE",
+              new Date().toISOString(),
+              store,
+              item.coupon || ""
+            ]);
+          }
+        });
+      }
 
       if (rowsToAdd.length > 0) {
         const lastRow = sheet.getLastRow();
-        sheet.getRange(lastRow + 1, 1, rowsToAdd.length, 8).setValues(rowsToAdd);
+        sheet.getRange(lastRow + 1, 1, rowsToAdd.length, 10).setValues(rowsToAdd);
       }
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        received: payload.items.length,
-        inserted: rowsToAdd.length
+        receivedItems: Array.isArray(payload.items) ? payload.items.length : 0,
+        insertedItems: rowsToAdd.length,
+        insertedCoupons: insertedCoupons
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // =========================================================================
-    // CASO B: Mensagem manual do Telegram com link do Mercado Livre
+    // CASO B: Mensagem manual do Telegram (Mercado Livre OU Shopee)
+    // Dica: você pode mandar o link + "CUPOM: CODIGO" na mesma mensagem!
     // =========================================================================
     if (payload.message && payload.message.text) {
       const text = payload.message.text.trim();
       const chatId = payload.message.chat.id;
 
-      // Regex para identificar links do Mercado Livre
-      const urlRegex = /(https?:\/\/[^\s]+mercadolivre[^\s]*|https?:\/\/meli\.la\/[^\s]+|https?:\/\/[^\s]*\/sec\/[^\s]+)/i;
+      // Aceita links do Mercado Livre e da Shopee
+      const urlRegex = /(https?:\/\/[^\s]*(?:mercadolivre|meli\.la|\/sec\/|shopee\.com\.br|s\.shopee\.com\.br|shope\.ee)[^\s]*)/i;
       const match = text.match(urlRegex);
 
       if (match) {
         const rawUrl = match[1];
-        enviarMensagemTelegram(chatId, "⏳ <i>Identifiquei seu link do Mercado Livre! Extraindo dados e preparando publicação prioritária...</i>");
+        const store = detectarLojaPorUrl(rawUrl);
 
-        const productData = extrairDadosOpenGraph(rawUrl);
+        // Verifica se o usuário informou um cupom na mensagem (ex: "CUPOM: MELI15")
+        let manualCoupon = "";
+        const couponMatch = text.match(/cupom[:\s]+([A-Z0-9_-]{3,25})/i);
+        if (couponMatch && couponMatch[1]) {
+          manualCoupon = couponMatch[1].toUpperCase();
+        }
+
+        enviarMensagemTelegram(chatId, "⏳ <i>Link da <b>" + store + "</b> identificado! Extraindo dados e preparando publicação prioritária...</i>");
+
+        const productData = extrairDadosOpenGraph(rawUrl, store);
         const sheet = getFilaSheet();
 
         sheet.appendRow([
@@ -170,27 +216,35 @@ function doPost(e) {
           productData.image,
           productData.url,
           "PRIORIDADE",
-          new Date().toISOString()
+          new Date().toISOString(),
+          store,
+          manualCoupon
         ]);
 
-        // Dispara imediatamente o envio da oferta com prioridade
-        const resultadoDisparo = dispararProximaOferta();
+        // Dispara imediatamente ignorando a trava de horário noturno
+        const resultadoDisparo = dispararProximaOferta(true);
 
         if (resultadoDisparo.sucesso) {
-          enviarMensagemTelegram(chatId, "🚀 <b>Oferta publicada com sucesso no canal!</b>\n\n📌 <b>Item:</b> " + productData.title);
+          let msgOk = "🚀 <b>Oferta publicada com sucesso no canal!</b>\n\n🏪 <b>Loja:</b> " + store + "\n📌 <b>Item:</b> " + productData.title;
+          if (resultadoDisparo.cupomUsado) {
+            msgOk += "\n🎟️ <b>Cupom aplicado:</b> <code>" + resultadoDisparo.cupomUsado + "</code>";
+          }
+          enviarMensagemTelegram(chatId, msgOk);
         } else {
-          enviarMensagemTelegram(chatId, "⚠️ <b>Atenção:</b> O produto foi salvo na planilha, mas a publicação no canal falhou.\n\n<b>Motivo:</b> " + (resultadoDisparo.motivo || "Verifique se o bot é administrador do canal"));
+          enviarMensagemTelegram(chatId, "⚠️ <b>Produto salvo na planilha, mas o envio ao canal falhou.</b>\n\n<b>Motivo:</b> " + (resultadoDisparo.motivo || "Verifique se o bot é administrador do canal."));
         }
 
         return HtmlService.createHtmlOutput("OK");
       } else {
-        enviarMensagemTelegram(chatId, "👋 Olá! Envie-me o link de um produto do <b>Mercado Livre</b> e publicarei imediatamente no canal de ofertas.");
+        enviarMensagemTelegram(
+          chatId,
+          "👋 Olá! Envie um link do <b>Mercado Livre</b> ou da <b>Shopee</b> e eu publico na hora no canal.\n\n💡 <i>Dica: se tiver cupom, envie junto assim:</i>\n<code>https://link... CUPOM: MEUCUPOM</code>"
+        );
         return HtmlService.createHtmlOutput("OK");
       }
     }
 
     return HtmlService.createHtmlOutput("OK");
-
   } catch (error) {
     Logger.log("Erro no doPost: " + error.toString());
     return HtmlService.createHtmlOutput("ERROR: " + error.toString());
@@ -200,36 +254,39 @@ function doPost(e) {
 }
 
 /**
- * Endpoint GET: Retorna os últimos 60 itens com status 'PUBLICADO' para a Vitrine Web
+ * Endpoint GET: Retorna os últimos 60 itens PUBLICADOS para a Vitrine Web
  */
 function doGet(e) {
   try {
     const sheet = getFilaSheet();
     const lastRow = sheet.getLastRow();
-    
+
     if (lastRow <= 1) {
       return ContentService.createTextOutput(JSON.stringify([]))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Colunas: 1=ID, 2=Titulo, 3=Preco_Antigo, 4=Preco_Atual, 5=Imagem_URL, 6=Link_Afiliado, 7=Status, 8=Data_Hora
-    const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+    const totalCols = Math.max(sheet.getLastColumn(), 10);
+    const values = sheet.getRange(2, 1, lastRow - 1, totalCols).getValues();
     const publishedItems = [];
 
-    // Itera do mais recente para o mais antigo
     for (let i = values.length - 1; i >= 0; i--) {
       const row = values[i];
-      const status = String(row[6]).trim().toUpperCase();
+      const status = String(row[6] || "").trim().toUpperCase();
 
       if (status === "PUBLICADO") {
+        const url = row[5] || "";
+        const store = (row[8] && String(row[8]).trim()) ? String(row[8]).trim() : detectarLojaPorUrl(url);
         publishedItems.push({
           id: row[0],
           title: row[1],
           oldPrice: row[2] || null,
           price: row[3] || "Confira",
           image: row[4] || "",
-          affiliateUrl: row[5] || "",
-          publishedAt: row[7] || ""
+          affiliateUrl: url,
+          publishedAt: row[7] || "",
+          store: store,
+          coupon: row[9] ? String(row[9]).trim() : ""
         });
 
         if (publishedItems.length >= 60) break;
@@ -238,7 +295,6 @@ function doGet(e) {
 
     return ContentService.createTextOutput(JSON.stringify(publishedItems))
       .setMimeType(ContentService.MimeType.JSON);
-
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -246,22 +302,31 @@ function doGet(e) {
 }
 
 /**
- * Dispara a próxima oferta da fila.
- * Procura primeiro 'PRIORIDADE'; se não encontrar, pega a primeira 'PENDENTE'.
- * Chamada pelo Acionador (Trigger) a cada 1 hora ou manualmente.
+ * Dispara a próxima oferta da fila (Trigger de 1 em 1 hora ou disparo imediato).
+ * @param {boolean} ignorarHorario Se true, publica fora da janela 08h-22h (usado em envios manuais).
  */
-function dispararProximaOferta() {
+function dispararProximaOferta(ignorarHorario) {
+  // 1. Trava de horário de Brasília (08h às 22h) para disparos automáticos
+  if (!ignorarHorario) {
+    const horaBrasilia = Number(Utilities.formatDate(new Date(), "America/Sao_Paulo", "H"));
+    if (horaBrasilia < HORARIO_INICIO || horaBrasilia > HORARIO_FIM) {
+      Logger.log("🌙 Fora do horário comercial (" + horaBrasilia + "h BRT). Próximo disparo às " + HORARIO_INICIO + "h.");
+      return { sucesso: false, motivo: "Fora do horário permitido (" + HORARIO_INICIO + "h às " + HORARIO_FIM + "h)" };
+    }
+  }
+
   const sheet = getFilaSheet();
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) {
-    Logger.log("Nenhuma linha encontrada na planilha.");
-    return false;
+    Logger.log("Nenhuma oferta encontrada na planilha.");
+    return { sucesso: false, motivo: "Fila vazia" };
   }
 
-  const values = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
-  let selectedRowIndex = -1; // 0-based relativo a values
+  const totalCols = Math.max(sheet.getLastColumn(), 10);
+  const values = sheet.getRange(2, 1, lastRow - 1, totalCols).getValues();
+  let selectedRowIndex = -1;
 
-  // 1. Busca prioridade primeiro
+  // Prioridade primeiro
   for (let i = 0; i < values.length; i++) {
     if (String(values[i][6]).trim().toUpperCase() === "PRIORIDADE") {
       selectedRowIndex = i;
@@ -269,7 +334,7 @@ function dispararProximaOferta() {
     }
   }
 
-  // 2. Se não houver prioridade, busca a primeira pendente
+  // Primeira pendente
   if (selectedRowIndex === -1) {
     for (let i = 0; i < values.length; i++) {
       if (String(values[i][6]).trim().toUpperCase() === "PENDENTE") {
@@ -280,42 +345,151 @@ function dispararProximaOferta() {
   }
 
   if (selectedRowIndex === -1) {
-    Logger.log("ℹ️ Nenhuma oferta pendente ou prioritária encontrada na fila.");
-    return false;
+    Logger.log("ℹ️ Nenhuma oferta pendente ou prioritária na fila.");
+    return { sucesso: false, motivo: "Nenhuma oferta pendente" };
   }
 
-  const rowNumber = selectedRowIndex + 2; // Linha real no Google Sheets
+  const rowNumber = selectedRowIndex + 2;
+  const row = values[selectedRowIndex];
+  const url = row[5] || "";
+  const store = (row[8] && String(row[8]).trim()) ? String(row[8]).trim() : detectarLojaPorUrl(url);
+  let couponText = row[9] ? String(row[9]).trim() : "";
+
+  // Busca cupom verificado na aba 'Cupons' caso o item não tenha cupom próprio
+  let couponObj = null;
+  if (!couponText) {
+    couponObj = buscarMelhorCupomVerificado(store, row[3]);
+    if (couponObj) {
+      couponText = couponObj.codigo;
+    }
+  }
+
   const item = {
-    id: values[selectedRowIndex][0],
-    title: values[selectedRowIndex][1],
-    oldPrice: values[selectedRowIndex][2],
-    price: values[selectedRowIndex][3],
-    image: values[selectedRowIndex][4],
-    affiliateUrl: values[selectedRowIndex][5]
+    id: row[0],
+    title: row[1],
+    oldPrice: row[2],
+    price: row[3],
+    image: row[4],
+    affiliateUrl: url,
+    store: store,
+    coupon: couponText,
+    couponDescription: couponObj ? couponObj.descricao : ""
   };
 
-  Logger.log("🎯 Processando publicação do item: " + item.id + " - " + item.title);
+  Logger.log("🎯 Publicando [" + item.store + "] " + item.id + " - " + item.title + (item.coupon ? " | Cupom: " + item.coupon : ""));
 
-  // 3. Gera copy persuasiva na API da Groq (Llama-3.3-70b-versatile)
   const copy = gerarCopyPersuasivaGroq(item);
-
-  // 4. Envia mensagem formatada para o Canal do Telegram
   const resultadoEnvio = publicarNoCanalTelegram(item, copy);
 
   if (resultadoEnvio.ok) {
-    // 5. Atualiza status para PUBLICADO
     sheet.getRange(rowNumber, 7).setValue("PUBLICADO");
     sheet.getRange(rowNumber, 8).setValue(new Date().toISOString());
+    sheet.getRange(rowNumber, 9).setValue(item.store);
+    if (item.coupon) {
+      sheet.getRange(rowNumber, 10).setValue(item.coupon);
+    }
     Logger.log("✅ Item " + item.id + " marcado como PUBLICADO.");
-    return { sucesso: true, item: item };
+    return { sucesso: true, item: item, cupomUsado: item.coupon };
   } else {
-    Logger.log("❌ Falha no envio ao Telegram para o item " + item.id + ": " + resultadoEnvio.description);
+    Logger.log("❌ Falha no envio ao Telegram: " + resultadoEnvio.description);
     return { sucesso: false, motivo: resultadoEnvio.description };
   }
 }
 
 /**
- * Gera texto persuasivo com Groq AI usando o modelo llama-3.3-70b-versatile
+ * Procura o melhor cupom ATIVO, VERIFICADO e COMPATÍVEL com o valor do produto na aba 'Cupons'
+ */
+function buscarMelhorCupomVerificado(loja, precoStr) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const couponSheet = ss.getSheetByName(COUPONS_SHEET_NAME);
+  if (!couponSheet || couponSheet.getLastRow() <= 1) return null;
+
+  const precoNum = parsePrecoBR(precoStr);
+  const hoje = new Date();
+  const rows = couponSheet.getRange(2, 1, couponSheet.getLastRow() - 1, 7).getValues();
+
+  let melhor = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const rLoja = String(rows[i][0] || "").trim().toLowerCase();
+    const rCodigo = String(rows[i][1] || "").trim();
+    const rDesc = String(rows[i][2] || "").trim();
+    const rMinimo = Number(rows[i][3] || 0);
+    const rValidade = rows[i][5];
+    const rAtivo = String(rows[i][6] || "").trim().toUpperCase();
+
+    if (!rCodigo || rAtivo !== "SIM") continue;
+    if (rLoja !== loja.toLowerCase()) continue;
+
+    // Checa validade se preenchida
+    if (rValidade) {
+      const dataVal = new Date(rValidade);
+      if (!isNaN(dataVal.getTime()) && dataVal < hoje) continue;
+    }
+
+    // Checa valor mínimo compatível com o produto
+    if (rMinimo > 0 && precoNum > 0 && precoNum < rMinimo) continue;
+
+    // Prefere o cupom com maior valor mínimo aplicável (normalmente dá maior desconto)
+    if (!melhor || rMinimo >= melhor.valorMinimo) {
+      melhor = {
+        codigo: rCodigo,
+        descricao: rDesc,
+        valorMinimo: rMinimo
+      };
+    }
+  }
+
+  return melhor;
+}
+
+/**
+ * Salva cupons verificados vindos do scraper na aba 'Cupons' sem duplicar
+ */
+function salvarCuponsVerificados(coupons) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let couponSheet = ss.getSheetByName(COUPONS_SHEET_NAME);
+  if (!couponSheet) {
+    setupPlanilha();
+    couponSheet = ss.getSheetByName(COUPONS_SHEET_NAME);
+  }
+
+  const existing = new Set();
+  const lastRow = couponSheet.getLastRow();
+  if (lastRow > 1) {
+    const vals = couponSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    vals.forEach(function(r) {
+      existing.add((String(r[0]).trim() + "|" + String(r[1]).trim()).toUpperCase());
+    });
+  }
+
+  const toAdd = [];
+  const validadePadrao = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000); // +5 dias
+
+  coupons.forEach(function(c) {
+    const key = (String(c.store || "") + "|" + String(c.code || "")).toUpperCase();
+    if (c.code && !existing.has(key)) {
+      existing.add(key);
+      toAdd.push([
+        c.store || "Mercado Livre",
+        String(c.code).trim().toUpperCase(),
+        c.description || "Cupom verificado",
+        Number(c.minValue || 0),
+        c.source || "Verificado",
+        Utilities.formatDate(validadePadrao, "America/Sao_Paulo", "yyyy-MM-dd"),
+        "SIM"
+      ]);
+    }
+  });
+
+  if (toAdd.length > 0) {
+    couponSheet.getRange(couponSheet.getLastRow() + 1, 1, toAdd.length, 7).setValues(toAdd);
+  }
+  return toAdd.length;
+}
+
+/**
+ * Gera texto persuasivo com Groq AI (llama-3.3-70b-versatile) incluindo cupom copiável
  */
 function gerarCopyPersuasivaGroq(item) {
   if (!GROQ_API_KEY || GROQ_API_KEY.includes("SEU_GROQ_API_KEY")) {
@@ -323,247 +497,210 @@ function gerarCopyPersuasivaGroq(item) {
   }
 
   try {
-    const prompt = `Você é um copywriter de elite especialista em canais de ofertas do Telegram e promoções do Mercado Livre no Brasil.
-Crie uma copy curta, altamente viciante e persuasiva para o produto abaixo.
+    const blocoCupom = item.coupon
+      ? `- Cupom Verificado: ${item.coupon}${item.couponDescription ? " (" + item.couponDescription + ")" : ""}`
+      : "- Cupom: Nenhum";
+
+    const prompt = `Você é um copywriter especialista em canais de ofertas e cupons do Telegram no Brasil.
+Crie uma copy curta, direta e persuasiva para o produto abaixo.
 
 DADOS DO PRODUTO:
+- Loja: ${item.store}
 - Título: ${item.title}
-- Preço Original: ${item.oldPrice || 'Não informado'}
-- Preço com Desconto / Atual: ${item.price}
+- Preço Original: ${item.oldPrice || "Não informado"}
+- Preço Atual: ${item.price}
+${blocoCupom}
 
 REGRAS OBRIGATÓRIAS:
-1. Use emojis estratégicos e empolgantes (ex: 🔥, ⚡, 😱, 📦, 🏷️).
-2. Destaque o desconto ou a oportunidade imperdível.
-3. Se houver preço original, use <s>${item.oldPrice}</s> e destaque o preço atual com <b>${item.price}</b>.
-4. Use APENAS formatação HTML válida do Telegram: <b>negrito</b>, <i>itálico</i>, <s>tachado</s>, <code>código</code>. NÃO use Markdown (* ou _).
-5. O texto NÃO deve conter o link nem instruções como "clique aqui", pois haverá um botão inline oficial anexado.
-6. Máximo de 500 caracteres para caber perfeitamente na legenda da foto.
-7. Retorne APENAS o texto promocional, sem saudações ou explicações.`;
+1. Comece indicando a loja com emoji (🟡 Mercado Livre ou 🟠 Shopee) e urgência.
+2. Se houver preço original, use <s>${item.oldPrice}</s> e destaque o preço atual com <b>${item.price}</b>.
+3. SE HOUVER CUPOM, inclua uma linha bem destacada com 🎟️ Use o cupom: <code>${item.coupon}</code> (toque para copiar!).
+4. Use APENAS tags HTML válidas do Telegram: <b>, <i>, <s>, <code>. NUNCA use Markdown (* ou _).
+5. NÃO inclua link nem escreva "clique aqui", pois haverá botão oficial abaixo.
+6. Máximo de 550 caracteres. Retorne APENAS o texto final.`;
 
-    const requestBody = {
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: "Você é um assistente de ofertas promocionais no Telegram. Responda apenas com a copy formatada em HTML." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 300
-    };
-
-    const options = {
+    const response = UrlFetchApp.fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "post",
       contentType: "application/json",
-      headers: {
-        "Authorization": "Bearer " + GROQ_API_KEY
-      },
-      payload: JSON.stringify(requestBody),
+      headers: { "Authorization": "Bearer " + GROQ_API_KEY },
+      payload: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: "Você gera copies promocionais em HTML puro para Telegram." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 320
+      }),
       muteHttpExceptions: true
-    };
+    });
 
-    const response = UrlFetchApp.fetch("https://api.groq.com/openai/v1/chat/completions", options);
     const json = JSON.parse(response.getContentText());
-
     if (json.choices && json.choices.length > 0) {
-      let copyText = json.choices[0].message.content.trim();
-      // Sanitiza para garantir tags seguras para o Telegram
-      copyText = sanitizarHtmlTelegram(copyText);
+      let copyText = sanitizarHtmlTelegram(json.choices[0].message.content.trim());
+      // Garante que o cupom sempre apareça copiável caso a IA esqueça
+      if (item.coupon && copyText.indexOf(item.coupon) === -1) {
+        copyText += "\n\n🎟️ <b>Cupom verificado:</b> <code>" + item.coupon + "</code> <i>(toque para copiar)</i>";
+      }
       return copyText;
     }
   } catch (err) {
-    Logger.log("⚠️ Erro na API Groq, utilizando copy fallback: " + err.toString());
+    Logger.log("⚠️ Erro na Groq API, usando fallback: " + err.toString());
   }
 
   return formatarCopyFallback(item);
 }
 
-/**
- * Copy fallback caso a API da Groq esteja offline ou sem chave
- */
 function formatarCopyFallback(item) {
-  let copy = "🔥 <b>OFERTA IMPERDÍVEL NO MERCADO LIVRE!</b>\n\n";
-  copy += "📦 <b>" + item.title + "</b>\n\n";
-
+  const badge = item.store === "Shopee" ? "🟠 <b>OFERTA SHOPEE!</b>" : "🟡 <b>OFERTA MERCADO LIVRE!</b>";
+  let copy = badge + "\n\n📦 <b>" + item.title + "</b>\n\n";
   if (item.oldPrice && item.oldPrice !== item.price) {
     copy += "❌ De: <s>" + item.oldPrice + "</s>\n";
   }
-  copy += "💥 <b>Por apenas: " + item.price + "</b>\n\n";
-  copy += "⚡ <i>Estoque limitado ou preço sujeito a alteração rápida!</i>";
+  copy += "💥 <b>Por: " + item.price + "</b>";
+  if (item.coupon) {
+    copy += "\n\n🎟️ <b>Use o cupom:</b> <code>" + item.coupon + "</code> <i>(toque para copiar)</i>";
+  }
+  copy += "\n\n⚡ <i>Preço e cupom sujeitos a alteração sem aviso!</i>";
   return copy;
 }
 
-/**
- * Sanitiza o texto para aceitar somente tags HTML do Telegram
- */
 function sanitizarHtmlTelegram(html) {
-  // Substitui markdown acidental por tags html
   let cleaned = html
     .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
     .replace(/__(.*?)__/g, "<i>$1</i>")
     .replace(/~~(.*?)~~/g, "<s>$1</s>");
-
-  // Garante que não ultrapasse 1000 caracteres (limite do caption do Telegram é 1024)
-  if (cleaned.length > 1000) {
-    cleaned = cleaned.substring(0, 990) + "...";
-  }
+  if (cleaned.length > 1000) cleaned = cleaned.substring(0, 990) + "...";
   return cleaned;
 }
 
 /**
- * Publica no Canal do Telegram com imagem e botão inline
+ * Publica no Canal do Telegram com foto + botão inline dinâmico por loja
  */
 function publicarNoCanalTelegram(item, copyText) {
+  const buttonText = item.store === "Shopee"
+    ? "🛍️ COMPRAR NA SHOPEE"
+    : "🛒 COMPRAR NO MERCADO LIVRE";
+
   const inlineKeyboard = {
-    inline_keyboard: [
-      [
-        {
-          text: "🛒 COMPRAR NO MERCADO LIVRE",
-          url: item.affiliateUrl || "https://www.mercadolivre.com.br"
-        }
-      ]
-    ]
+    inline_keyboard: [[{ text: buttonText, url: item.affiliateUrl || "https://www.mercadolivre.com.br" }]]
   };
 
-  // 1. Tenta envio com foto (sendPhoto) se houver imagem válida
   if (item.image && item.image.startsWith("http")) {
     try {
-      const photoPayload = {
-        chat_id: TELEGRAM_CHANNEL_ID,
-        photo: item.image,
-        caption: copyText,
-        parse_mode: "HTML",
-        reply_markup: JSON.stringify(inlineKeyboard)
-      };
-
-      const options = {
+      const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendPhoto", {
         method: "post",
         contentType: "application/json",
-        payload: JSON.stringify(photoPayload),
+        payload: JSON.stringify({
+          chat_id: TELEGRAM_CHANNEL_ID,
+          photo: item.image,
+          caption: copyText,
+          parse_mode: "HTML",
+          reply_markup: JSON.stringify(inlineKeyboard)
+        }),
         muteHttpExceptions: true
-      };
-
-      const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendPhoto", options);
+      });
       const resJson = JSON.parse(response.getContentText());
-
-      if (resJson.ok) {
-        return { ok: true };
-      } else {
-        Logger.log("⚠️ sendPhoto falhou (" + resJson.description + "), tentando sendMessage fallback...");
-      }
+      if (resJson.ok) return { ok: true };
+      Logger.log("⚠️ sendPhoto falhou (" + resJson.description + "), tentando sendMessage...");
     } catch (err) {
-      Logger.log("⚠️ Exceção no sendPhoto: " + err.toString());
+      Logger.log("⚠️ Exceção sendPhoto: " + err.toString());
     }
   }
 
-  // 2. Fallback via texto puro (sendMessage)
   try {
-    const textPayload = {
-      chat_id: TELEGRAM_CHANNEL_ID,
-      text: copyText,
-      parse_mode: "HTML",
-      reply_markup: JSON.stringify(inlineKeyboard),
-      disable_web_page_preview: false
-    };
-
-    const options = {
+    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage", {
       method: "post",
       contentType: "application/json",
-      payload: JSON.stringify(textPayload),
+      payload: JSON.stringify({
+        chat_id: TELEGRAM_CHANNEL_ID,
+        text: copyText,
+        parse_mode: "HTML",
+        reply_markup: JSON.stringify(inlineKeyboard),
+        disable_web_page_preview: false
+      }),
       muteHttpExceptions: true
-    };
-
-    const response = UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage", options);
+    });
     const resJson = JSON.parse(response.getContentText());
-    if (resJson.ok) {
-      return { ok: true };
-    } else {
-      return { ok: false, description: resJson.description || "Erro no Telegram" };
-    }
+    return resJson.ok ? { ok: true } : { ok: false, description: resJson.description || "Erro Telegram" };
   } catch (err) {
-    Logger.log("❌ Falha crítica no envio ao Telegram: " + err.toString());
     return { ok: false, description: err.toString() };
   }
 }
 
-/**
- * Envia uma mensagem direta de resposta para um chat específico do Telegram
- */
 function enviarMensagemTelegram(chatId, text) {
   try {
-    const payload = {
-      chat_id: chatId,
-      text: text,
-      parse_mode: "HTML"
-    };
-
     UrlFetchApp.fetch("https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage", {
       method: "post",
       contentType: "application/json",
-      payload: JSON.stringify(payload),
+      payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: "HTML" }),
       muteHttpExceptions: true
     });
   } catch (e) {
-    Logger.log("Erro ao enviar mensagem direta no Telegram: " + e.toString());
+    Logger.log("Erro envio direto Telegram: " + e.toString());
   }
 }
 
-/**
- * Extrai metadados de uma URL do Mercado Livre via OpenGraph (og:title, og:image, etc.)
- */
-function extrairDadosOpenGraph(url) {
+function extrairDadosOpenGraph(url, store) {
+  const isShopee = store === "Shopee";
   const result = {
-    id: "MLB-MANUAL-" + new Date().getTime(),
-    title: "Oferta Mercado Livre",
+    id: (isShopee ? "SHP-MANUAL-" : "MLB-MANUAL-") + new Date().getTime(),
+    title: isShopee ? "Oferta Shopee" : "Oferta Mercado Livre",
     oldPrice: "",
     price: "Confira na loja",
-    image: "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.5/mercadolivre/logo__large_plus.png",
+    image: isShopee
+      ? "https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/ca5d12864c12916c05640b36e47ac5c9.png"
+      : "https://http2.mlstatic.com/frontend-assets/ui-navigation/5.19.5/mercadolibre/logo__large_plus.png",
     url: url
   };
 
   try {
     const mlbMatch = url.match(/(ML[A-Z]?-?\d+)/i);
-    if (mlbMatch) {
-      result.id = mlbMatch[1].replace("-", "").toUpperCase();
-    }
+    if (mlbMatch) result.id = mlbMatch[1].replace("-", "").toUpperCase();
 
     const html = UrlFetchApp.fetch(url, {
       muteHttpExceptions: true,
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         "Accept-Language": "pt-BR,pt;q=0.9"
       }
     }).getContentText();
 
-    // og:title
     const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
                        html.match(/<title>(.*?)<\/title>/i);
     if (titleMatch && titleMatch[1]) {
       result.title = decodeHtmlEntities(titleMatch[1].trim());
     }
 
-    // og:image
     const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
     if (imageMatch && imageMatch[1]) {
       result.image = imageMatch[1].trim();
     }
 
-    // Extração de preço
-    const priceAmountMatch = html.match(/<meta\s+property=["']product:price:amount["']\s+content=["'](.*?)["']/i) ||
-                             html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([\d.]+)</i);
-    if (priceAmountMatch && priceAmountMatch[1]) {
-      const priceVal = priceAmountMatch[1].trim();
-      result.price = "R$ " + (priceVal.includes(",") ? priceVal : priceVal + ",00");
+    const priceMatch = html.match(/<meta\s+property=["']product:price:amount["']\s+content=["'](.*?)["']/i) ||
+                       html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([\d.]+)</i);
+    if (priceMatch && priceMatch[1]) {
+      const val = priceMatch[1].trim();
+      result.price = "R$ " + (val.includes(",") ? val : val + ",00");
     }
-
   } catch (err) {
-    Logger.log("Erro ao extrair OpenGraph da URL: " + err.toString());
+    Logger.log("Erro OpenGraph: " + err.toString());
   }
 
   return result;
 }
 
-/**
- * Utilitário: Decodifica entidades HTML comuns
- */
+function detectarLojaPorUrl(url) {
+  if (/shopee|shope\.ee/i.test(String(url || ""))) return "Shopee";
+  return "Mercado Livre";
+}
+
+function parsePrecoBR(str) {
+  if (!str) return 0;
+  const clean = String(str).replace(/[^\d,]/g, "").replace(",", ".");
+  return parseFloat(clean) || 0;
+}
+
 function decodeHtmlEntities(str) {
   return str
     .replace(/&amp;/g, "&")
@@ -573,9 +710,6 @@ function decodeHtmlEntities(str) {
     .replace(/&gt;/g, ">");
 }
 
-/**
- * Utilitário: Retorna a aba de fila
- */
 function getFilaSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
@@ -586,9 +720,6 @@ function getFilaSheet() {
   return sheet;
 }
 
-/**
- * Utilitário: Retorna Set com IDs existentes na coluna A
- */
 function getExistingProductIds(sheet) {
   const ids = new Set();
   const lastRow = sheet.getLastRow();
