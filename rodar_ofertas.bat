@@ -10,8 +10,9 @@ REM Configuracoes principais
 set GAS_WEBHOOK_URL=https://script.google.com/macros/s/AKfycbxqLd4weUfIuY1Qu6pUq3CLPlKAlBltvavKBQ3weMzP1bdL7FljcpMRGsBusxh3hYZjig/exec
 set ML_AFFILIATE_TAG=matt_tool=63310789^&matt_word=ms20251105065623
 
-REM Opcional: preencha quando tiver sua tag ou API da Shopee liberada
-REM set SHOPEE_AFFILIATE_TAG=utm_source=an_SEU_ID^&utm_medium=affiliates
+REM Shopee Afiliados (ID an_18330020154)
+set SHOPEE_AFFILIATE_TAG=utm_source=an_18330020154^&utm_medium=affiliates^&mmp_pid=an_18330020154
+REM Preencha abaixo quando a Shopee Open API for liberada na sua conta
 REM set SHOPEE_APP_ID=SEU_SHOPEE_APP_ID
 REM set SHOPEE_SECRET=SEU_SHOPEE_SECRET
 
