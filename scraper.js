@@ -2,11 +2,11 @@
  * scraper.js - Curadoria Multi-Loja (Mercado Livre + Shopee + Cupons Verificados)
  *
  * Funcionalidades:
- * 1. Mercado Livre: extrai produtos Mais Vendidos e Ofertas + selos oficiais de cupom.
+ * 1. Mercado Livre: extrai produtos Mais Vendidos e Ofertas (via DOM + JSON-LD estruturado) + selos oficiais de cupom.
  * 2. Shopee:
  *    - Se SHOPEE_APP_ID e SHOPEE_SECRET estiverem definidos, usa a Shopee Affiliate Open API (GraphQL) oficial.
- *    - Caso contrário, usa Playwright em modo headless para extrair Ofertas Relâmpago / Mais Vendidos.
- * 3. Cupons Confiáveis: coleta cupons marcados como "Verificado" / com aprovação de usuários em fontes confiáveis (Cuponomia).
+ *    - Caso contrário, usa Playwright para extrair Ofertas Relâmpago / Mais Vendidos.
+ * 3. Cupons Confiáveis: coleta cupons marcados como "Verificado" / "Testado" em fontes confiáveis (Cuponomia).
  * 4. Envia o lote completo (items + coupons) via POST para GAS_WEBHOOK_URL (Google Apps Script).
  */
 
@@ -99,8 +99,9 @@ async function scrapeMercadoLivre(browser) {
 
   const page = await context.newPage();
   const urlsToVisit = [
-    'https://www.mercadolivre.com.br/mais-vendidos',
     'https://www.mercadolivre.com.br/ofertas',
+    'https://www.mercadolivre.com.br/mais-vendidos/MLB1051', // Celulares e Telefones
+    'https://www.mercadolivre.com.br/mais-vendidos/MLB1574', // Casa, Móveis e Decoração
   ];
 
   const collected = [];
@@ -111,53 +112,97 @@ async function scrapeMercadoLivre(browser) {
       if (collected.length >= MAX_ML_ITEMS) break;
       console.log(`   🌐 Acessando ${targetUrl}...`);
 
+      let status = 0;
       try {
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        const resp = await page.goto(targetUrl, { waitUntil: 'load', timeout: 35000 });
+        status = resp ? resp.status() : 0;
+        await page.waitForTimeout(2500);
       } catch (navErr) {
         console.warn(`   ⚠️ Falha ao abrir ${targetUrl}: ${navErr.message}`);
         continue;
       }
 
-      try {
-        const cookieBtn = await page.$('button[data-testid="action:understood-cookies"], button:has-text("Entendido"), button:has-text("Aceitar cookies")');
-        if (cookieBtn) await cookieBtn.click().catch(() => {});
-      } catch (_) {}
+      const pageTitle = await page.title().catch(() => '');
+      const finalUrl = page.url();
+      console.log(`   ℹ️ HTTP ${status} | Título: "${pageTitle}" | URL: ${finalUrl.slice(0, 80)}`);
+
+      if (status === 403 || /captcha|verif|account-verification|gz\/account/i.test(finalUrl + ' ' + pageTitle)) {
+        console.warn('   ⚠️ Página solicitou verificação humana/login ou retornou 403. Pulando.');
+        continue;
+      }
 
       for (let s = 0; s < 3; s++) {
         await page.mouse.wheel(0, 900);
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(700);
       }
 
       const rawItems = await page.evaluate(() => {
         const results = [];
-        const selectors = [
+        const seenHref = new Set();
+
+        // Estratégia 1: Dados estruturados JSON-LD (Schema.org) se presentes na página
+        const ldScripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+        for (const sc of ldScripts) {
+          try {
+            const data = JSON.parse(sc.textContent || '{}');
+            const list = data?.itemListElement || (Array.isArray(data) ? data : []);
+            for (const entry of list) {
+              const prod = entry?.item || entry;
+              if (prod && prod['@type'] === 'Product' && prod.name && prod.url) {
+                const offer = Array.isArray(prod.offers) ? prod.offers[0] : prod.offers;
+                const priceNum = offer?.price;
+                if (!seenHref.has(prod.url)) {
+                  seenHref.add(prod.url);
+                  results.push({
+                    rawUrl: prod.url,
+                    title: String(prod.name).trim(),
+                    price: priceNum ? `R$ ${Number(priceNum).toFixed(2).replace('.', ',')}` : '',
+                    oldPrice: null,
+                    image: Array.isArray(prod.image) ? prod.image[0] : (prod.image || ''),
+                    officialCoupon: '',
+                  });
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Estratégia 2: Cards do DOM (seletores modernos e genéricos)
+        const cardSelectors = [
           '.poly-card',
           '.promotion-item',
           '.ui-recommendations-card',
+          'li.ui-search-layout__item',
           'li.items-list__item',
           '.andes-card',
         ];
 
         let cards = [];
-        for (const sel of selectors) {
+        for (const sel of cardSelectors) {
           const found = Array.from(document.querySelectorAll(sel));
-          if (found.length >= 4) {
+          if (found.length >= 3) {
             cards = found;
             break;
           }
         }
 
+        // Estratégia 3: Fallback por links diretos de produto
+        if (cards.length === 0) {
+          const anchors = Array.from(document.querySelectorAll('a[href*="/p/MLB"], a[href*="produto.mercadolivre.com.br/MLB"], a[href*="/MLB-"]'));
+          cards = anchors.map((a) => a.closest('li, article, div') || a);
+        }
+
         for (const card of cards) {
           if (results.length >= 25) break;
 
-          const anchor = card.querySelector('a[href*="mercadolivre.com"], a[href*="/p/"], a[href*="/MLB"]') || card.querySelector('a');
+          const anchor = card.querySelector('a[href*="/p/MLB"], a[href*="produto.mercadolivre.com.br"], a[href*="/MLB"], a[href*="mercadolivre.com"]') || (card.tagName === 'A' ? card : card.querySelector('a'));
           if (!anchor || !anchor.href) continue;
           const href = anchor.href;
-          if (href.includes('/ofertas?') || href.endsWith('/ofertas') || href.endsWith('/mais-vendidos')) continue;
+          if (seenHref.has(href) || href.includes('/ofertas?') || href.endsWith('/ofertas') || href.includes('/mais-vendidos')) continue;
 
           const titleEl = card.querySelector('.poly-component__title, .promotion-item__title, .ui-recommendations-card__title, h2, h3, a[title]');
-          const title = (titleEl?.getAttribute('title') || titleEl?.textContent || '').trim();
-          if (!title || title.length < 5) continue;
+          const title = (titleEl?.getAttribute('title') || titleEl?.textContent || anchor.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!title || title.length < 6) continue;
 
           const fracEl = card.querySelector('.poly-price__current .andes-money-amount__fraction, .andes-money-amount--previous + .andes-money-amount .andes-money-amount__fraction, .andes-money-amount__fraction');
           const centsEl = card.querySelector('.poly-price__current .andes-money-amount__cents, .andes-money-amount__cents');
@@ -175,9 +220,8 @@ async function scrapeMercadoLivre(browser) {
             if (oldFrac) oldPrice = `R$ ${oldFrac},00`;
           }
 
-          // Detecta selo oficial de cupom na própria página do Mercado Livre
           let officialCoupon = '';
-          const couponEl = card.querySelector('[class*="coupon"], [class*="voucher"], .poly-component__coupons, .andes-tag');
+          const couponEl = card.querySelector('[class*="coupon"], [class*="voucher"], .poly-component__coupons');
           if (couponEl) {
             const txt = (couponEl.textContent || '').replace(/\s+/g, ' ').trim();
             if (/cupom|off|desconto/i.test(txt) && txt.length <= 60) {
@@ -199,8 +243,10 @@ async function scrapeMercadoLivre(browser) {
             image = image.replace('-I.jpg', '-O.jpg').replace('-I.webp', '-O.webp');
           }
 
+          seenHref.add(href);
           results.push({ rawUrl: href, title, price, oldPrice, image, officialCoupon });
         }
+
         return results;
       });
 
@@ -333,17 +379,28 @@ async function scrapeShopeePlaywright(browser) {
       if (collected.length >= MAX_SHOPEE_ITEMS) break;
       console.log(`   🌐 Acessando ${targetUrl}...`);
 
+      let status = 0;
       try {
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 35000 });
+        const resp = await page.goto(targetUrl, { waitUntil: 'load', timeout: 35000 });
+        status = resp ? resp.status() : 0;
         await page.waitForTimeout(3000);
       } catch (err) {
         console.warn(`   ⚠️ Falha ao abrir ${targetUrl}: ${err.message}`);
         continue;
       }
 
+      const pageTitle = await page.title().catch(() => '');
+      const finalUrl = page.url();
+      console.log(`   ℹ️ HTTP ${status} | Título: "${pageTitle}" | URL: ${finalUrl.slice(0, 80)}`);
+
+      if (status === 403 || /login|verify|captcha/i.test(finalUrl)) {
+        console.warn('   ⚠️ Shopee solicitou login ou verificação humana. Pulando.');
+        continue;
+      }
+
       for (let s = 0; s < 3; s++) {
         await page.mouse.wheel(0, 800);
-        await page.waitForTimeout(900);
+        await page.waitForTimeout(800);
       }
 
       const rawItems = await page.evaluate(() => {
@@ -359,14 +416,13 @@ async function scrapeShopeePlaywright(browser) {
           const imgEl = a.querySelector('img') || card.querySelector('img');
           const image = imgEl ? (imgEl.getAttribute('src') || imgEl.getAttribute('data-src') || '') : '';
 
-          // Texto completo do card para extrair título e preço
           const textLines = (a.innerText || card.innerText || '')
             .split('\n')
             .map((l) => l.trim())
             .filter(Boolean);
 
           const priceLine = textLines.find((l) => /^R\$\s?[\d.,]+/.test(l)) || '';
-          const titleLine = textLines.find((l) => l.length > 12 && !l.startsWith('R$') && !/^\d+%/.test(l) && !/vendido/i.test(l)) || imgEl?.getAttribute('alt') || '';
+          const titleLine = textLines.find((l) => l.length > 10 && !l.startsWith('R$') && !/^\d+%/.test(l) && !/vendido/i.test(l)) || imgEl?.getAttribute('alt') || '';
 
           if (!titleLine) continue;
 
@@ -433,8 +489,10 @@ async function scrapeTrustedCoupons(browser) {
   try {
     for (const src of sources) {
       try {
-        await page.goto(src.url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+        const resp = await page.goto(src.url, { waitUntil: 'load', timeout: 25000 });
+        const status = resp ? resp.status() : 0;
         await page.waitForTimeout(1500);
+        console.log(`   ℹ️ [${src.store}] Cuponomia HTTP ${status}`);
 
         const found = await page.evaluate((storeName) => {
           const list = [];
@@ -444,11 +502,9 @@ async function scrapeTrustedCoupons(browser) {
             if (list.length >= 6) break;
             const fullText = (el.innerText || '').replace(/\s+/g, ' ').trim();
 
-            // Exige sinal de verificação/teste ou avaliações positivas
             const isVerified = /verificado|testado|funcionou|aprovado/i.test(fullText);
             if (!isVerified) continue;
 
-            // Tenta capturar código explícito em atributos ou elementos de código
             const codeAttr = el.getAttribute('data-code') || el.querySelector('[data-code]')?.getAttribute('data-code') || '';
             const codeEl = el.querySelector('.code, [class*="coupon-code"], code');
             const code = (codeAttr || codeEl?.textContent || '').trim().toUpperCase();
@@ -458,12 +514,9 @@ async function scrapeTrustedCoupons(browser) {
             const titleEl = el.querySelector('h2, h3, .item-title, [class*="title"]');
             const desc = (titleEl?.textContent || fullText).slice(0, 120).trim();
 
-            // Tenta identificar valor mínimo na descrição (ex: "acima de R$ 100")
             let minVal = 0;
             const minMatch = desc.match(/acima de\s*R\$\s*([\d.]+)/i) || desc.match(/mínim[oa].*?R\$\s*([\d.]+)/i);
-            if (minMatch) {
-              minVal = Number(minMatch[1].replace(/\./g, '')) || 0;
-            }
+            if (minMatch) minVal = Number(minMatch[1].replace(/\./g, '')) || 0;
 
             list.push({
               store: storeName,
@@ -509,10 +562,8 @@ async function run() {
   });
 
   try {
-    // 1. Mercado Livre
     const mlItems = await scrapeMercadoLivre(browser);
 
-    // 2. Shopee (API oficial se configurada, senão Playwright)
     let shopeeItems = [];
     if (SHOPEE_APP_ID && SHOPEE_SECRET) {
       try {
@@ -525,10 +576,8 @@ async function run() {
       shopeeItems = await scrapeShopeePlaywright(browser);
     }
 
-    // 3. Cupons Verificados
     const verifiedCoupons = await scrapeTrustedCoupons(browser);
 
-    // Intercala Mercado Livre e Shopee para o canal ficar variado
     const allItems = [];
     const maxLen = Math.max(mlItems.length, shopeeItems.length);
     for (let i = 0; i < maxLen; i++) {
